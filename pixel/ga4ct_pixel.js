@@ -43,16 +43,13 @@ window.ga4ct = {
 			ga4ct.extendSessionId();
 		}
 
-		// Construct event data
-		var event_data = { 'value': event_value };
-
 		// Looks like we should use XMLHttpRequest
 		// https://developer.mozilla.org/en-US/docs/Web/API/XMLHttpRequest
 		// https://www.w3schools.com/xml/xml_http.asp
 		const xhr = new XMLHttpRequest();
 		xhr.open('POST', ga4ct.SEND_ENDPOINT, true);
 		xhr.setRequestHeader('Content-Type', 'application/json');
-		xhr.send(JSON.stringify({ 'event_name': event_name, 'event_data':  event_data }));
+		xhr.send(JSON.stringify({ 'event_name': event_name, 'event_value':  event_value }));
 	},
 
 	// Functions for managing device, session ID
