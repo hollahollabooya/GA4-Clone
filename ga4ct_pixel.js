@@ -7,6 +7,9 @@ window.ga4ct = {
 	SID_COOKIE_NAME: "_ga4ct_sid",
 	CID_PREFIX: "GA4CT.CID.",
 	SID_PREFIX: "GA4CT.SID.",
+	CID_REGEX: /^GA4CT\.CID\.\d+\.\d+$/,
+	SID_REGEX: /^GA4CT\.SID\.\d+\.\d+$/,
+	SEND_ENDPOINT: "http://localhost:3000/event",
 
 	// Helper functions
 	readCookie: function (name) {
@@ -18,7 +21,7 @@ window.ga4ct = {
 		var d = new Date();
 		d.setTime(d.getTime() + expiration);
 		var expires = "expires="+ d.toUTCString();
-		document.cookie = name + "=" + value + ";" + expiration + ";domain=" + ga4ct.DOMAIN + ";path=/";
+		document.cookie = name + "=" + value + ";" + expires + ";domain=" + ga4ct.DOMAIN + ";path=/";
 	},
 	// I could use UUIDs for ids which is probably fine to start
 	// It might be better in the future to request IDs from the server instead?
@@ -26,27 +29,38 @@ window.ga4ct = {
 		return Math.floor(Math.random() * 0x7FFFFFFF) + "." + Math.floor(Date.now() / 1000);
 	},
 
-	// Main functions for managing sessions and events
-	init: function () {
-		
-	},
 	// I'll only allow event name and value for now and may extend to optional parameters later
-	send: function (event, value = null) {
-		
+	send: function (event_name, event_value = null) {
+		// Check if CID and SID are set. If not, set new ones
+		if(!ga4ct.validateClientId()) {
+			ga4ct.newClientId();
+			ga4ct.newSessionId();
+		} else if (!ga4ct.validateSessionId()) {
+			ga4ct.extendCliendId();
+			ga4ct.newSessionId();
+		} else {
+			ga4ct.extendCliendId();
+			ga4ct.extendSessionId();
+		}
+
+		// Construct event data
+		var event_data = { 'value': event_value };
+
+		// Looks like we should use XMLHttpRequest
+		// https://developer.mozilla.org/en-US/docs/Web/API/XMLHttpRequest
+		// https://www.w3schools.com/xml/xml_http.asp
+		const xhr = new XMLHttpRequest();
+		xhr.open('POST', ga4ct.SEND_ENDPOINT, true);
+		xhr.setRequestHeader('Content-Type', 'application/json');
+		xhr.send(JSON.stringify({ 'event_name': event_name, 'event_data':  event_data }));
 	},
 
 	// Functions for managing device, session ID
-	checkClientId: function () {
-		return ga4ct.getClientId() !== undefined;
-	},
-	checkSessionId: function () {
-		return ga4ct.getSessionId() !== undefined;
-	},
 	validateClientId: function () {
-		return /^GA4CT\.CID\.\d+\.\d+$/.test(ga4ct.getClientId());
+		return ga4ct.CID_REGEX.test(ga4ct.getClientId());
 	},
 	validateSessionId: function () {
-		return /^GA4CT\.SID\.\d+\.\d+$/.test(ga4ct.getSessionId());
+		return ga4ct.SID_REGEX.test(ga4ct.getSessionId());
 	},
 	getClientId: function () {
 		return ga4ct.readCookie(ga4ct.CID_COOKIE_NAME);
@@ -55,14 +69,26 @@ window.ga4ct = {
 		return ga4ct.readCookie(ga4ct.SID_COOKIE_NAME);
 	},
 	newClientId: function () {
-		writeCookie(ga4ct.CID_COOKIE_NAME,
+		ga4ct.writeCookie(ga4ct.CID_COOKIE_NAME,
 			ga4ct.CID_PREFIX + ga4ct.generateUniqueId(),
 			ga4ct.MAX_EPIRATION
 		);
 	},
 	newSessionId: function () {
-		writeCookie(ga4ct.CID_COOKIE_NAME,
-			ga4ct.CID_PREFIX + ga4ct.generateUniqueId(),
+		ga4ct.writeCookie(ga4ct.SID_COOKIE_NAME,
+			ga4ct.SID_PREFIX + ga4ct.generateUniqueId(),
+			ga4ct.SESSION_EXPIRATION
+		);
+	},
+	extendCliendId: function() {
+		ga4ct.writeCookie(ga4ct.CID_COOKIE_NAME,
+			ga4ct.getClientId(),
+			ga4ct.MAX_EPIRATION
+		);
+	},
+	extendSessionId: function () {
+		ga4ct.writeCookie(ga4ct.SID_COOKIE_NAME,
+			ga4ct.getSessionId(),
 			ga4ct.SESSION_EXPIRATION
 		);
 	}
