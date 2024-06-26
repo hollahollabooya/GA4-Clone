@@ -7,7 +7,7 @@ import (
     "encoding/json"
 )
 
-/* The keys here need to match the keys in the JSON object exactly
+/* The key names here need to match the key names in the JSON object exactly
  * I don't know how to get around that but that's how we'll do it for now
  */
 type Event struct {
@@ -44,7 +44,7 @@ func main() {
 }
 
 func enableCORS(w *http.ResponseWriter) {
-    (*w).Header().Set("Access-Control-Allow-Origin", "*")
+    (*w).Header().Set("Access-Control-Allow-Origin", "hollahollabooya.github.io")
     (*w).Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
     (*w).Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 }
