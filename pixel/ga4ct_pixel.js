@@ -49,7 +49,7 @@ window.ga4ct = {
 		const xhr = new XMLHttpRequest();
 		xhr.open('POST', ga4ct.SEND_ENDPOINT, true);
 		xhr.setRequestHeader('Content-Type', 'application/json');
-		xhr.send(JSON.stringify({ 'event_name': event_name, 'event_value':  event_value }));
+		xhr.send(JSON.stringify({ 'EventName': event_name, 'EventValue':  event_value }));
 	},
 
 	// Functions for managing device, session ID

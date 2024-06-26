@@ -4,12 +4,15 @@ import (
     "fmt"
     "net/http"
     "log"
-    "io/ioutil"
+    "encoding/json"
 )
 
+/* The keys here need to match the keys in the JSON object exactly
+ * I don't know how to get around that but that's how we'll do it for now
+ */
 type Event struct {
-    name  string    `json:"event_name"`
-    value int       `json:"event_value"`
+    EventName  string
+    EventValue int
 }
 
 func main() {
@@ -26,17 +29,14 @@ func main() {
         }
 
         // Read the request body
-        body, err := ioutil.ReadAll(r.Body)
+        var event Event
+        err := json.NewDecoder(r.Body).Decode(&event)
         if err != nil {
-            http.Error(w, "Error reading request body: "+err.Error(), http.StatusBadRequest)
+            http.Error(w, err.Error(), http.StatusBadRequest)
             return
         }
 
-        // Print the request body for debugging
-        fmt.Println("Request Body:", string(body))
-
-
-        // I can read the body, but I can't properly decode the JSON into the struct woot woot
+        fmt.Printf("Event: %+v \n", event)
     })
 
     fmt.Println("Server is running on http://localhost:3000")
