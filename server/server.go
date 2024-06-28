@@ -87,12 +87,18 @@ func main() {
         }
     })
 
+    fs := http.FileServer(http.Dir("../html"))
+    http.Handle("/", fs)
+
+    pixelFs := http.FileServer(http.Dir("../pixel"))
+    http.Handle("/pixel/", http.StripPrefix("/pixel", pixelFs))
+
     fmt.Println("Server is running on http://localhost:3000")
     log.Fatal(http.ListenAndServe(":3000", nil))
 }
 
 func enableCORS(w *http.ResponseWriter) {
-    (*w).Header().Set("Access-Control-Allow-Origin", "https://hollahollabooya.github.io")
+    (*w).Header().Set("Access-Control-Allow-Origin", "*")
     (*w).Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
     (*w).Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 }
