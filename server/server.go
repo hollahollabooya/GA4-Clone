@@ -8,6 +8,7 @@ import (
     "database/sql"
     "os"
     "strconv"
+    "html/template"
 
     _ "github.com/lib/pq"
     "github.com/joho/godotenv"
@@ -17,6 +18,7 @@ import (
  * I don't know how to get around that but that's how we'll do it for now
  */
 type Event struct {
+    EventID    int
     EventName  string
     EventValue float64
 }
@@ -87,8 +89,35 @@ func main() {
         }
     })
 
-    fs := http.FileServer(http.Dir("../html"))
-    http.Handle("/", fs)
+    http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+        rows, err := db.Query(`SELECT * FROM events ORDER BY id DESC LIMIT 10`)
+        if err != nil {
+            http.Error(w, err.Error(), http.StatusInternalServerError)
+            return
+        }
+        defer rows.Close()
+
+        var events []Event
+        for rows.Next() {
+            var event Event
+            if err := rows.Scan(&event.EventID, &event.EventName, &event.EventValue); err != nil {
+                http.Error(w, err.Error(), http.StatusInternalServerError)
+                return
+            }
+            events = append(events, event)
+        }
+        if err := rows.Err(); err != nil {
+            http.Error(w, err.Error(), http.StatusInternalServerError)
+            return
+        }
+
+        tmpl := template.Must(template.ParseFiles("../html/index.html"))
+        tmpl.Execute(w, map[string]interface{}{"events": events})
+    })
+
+
+    // fs := http.FileServer(http.Dir("../html"))
+    // http.Handle("/", fs)
 
     pixelFs := http.FileServer(http.Dir("../pixel"))
     http.Handle("/pixel/", http.StripPrefix("/pixel", pixelFs))

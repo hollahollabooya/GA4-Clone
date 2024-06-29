@@ -15,8 +15,22 @@
       <button onclick="sendEvent();">Click me</button>
       <script>
         function sendEvent() {
-          ga4ct.send("button_click");
+          ga4ct.send("button_click", Math.random());
         }
       </script>
+      <table>
+        <tr>
+            <th>ID</th>
+            <th>Event Name</th>
+            <th>Event Value</th>
+        </tr>
+        {{range .events}}
+        <tr>
+            <td>{{.EventID}}</td>
+            <td>{{.EventName}}</td>
+            <td>{{.EventValue}}</td>
+        </tr>
+        {{end}}
+      </table>
   </body>
 </html>
