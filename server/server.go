@@ -12,6 +12,7 @@ import (
 
     _ "github.com/lib/pq"
     "github.com/joho/godotenv"
+    "github.com/gorilla/websocket"
 )
 
 /* The key names here need to match the key names in the JSON object exactly
@@ -22,6 +23,17 @@ type Event struct {
     EventName  string
     EventValue float64
 }
+
+var upgrader = websocket.Upgrader{
+    ReadBufferSize:  1024,
+    WriteBufferSize: 1024,
+    CheckOrigin: func(r *http.Request) bool {
+        return true
+    },
+}
+
+var clients = make(map[*websocket.Conn]bool)
+var broadcast = make(chan Event)
 
 func main() {
     // Load the environment credentials
@@ -59,6 +71,8 @@ func main() {
 
     fmt.Println("Successfully connected to the database")
 
+    go handleMessages()
+
     // Handler function for storing events from pixel
     http.HandleFunc("/event", func(w http.ResponseWriter, r *http.Request) {
         enableCORS(&w)
@@ -83,11 +97,16 @@ func main() {
         fmt.Printf("Event: %+v \n", event)
 
         // Insert the event into the DB
-        err = insertEvent(db, event)
+        err, event.EventID = insertEvent(db, event)
         if err != nil {
             log.Fatal(err)
         }
+
+        // Broadcast event to websockets
+        broadcast <- event
     })
+
+    http.HandleFunc("/ws", handleConnections)
 
     http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
         rows, err := db.Query(`SELECT * FROM events ORDER BY id DESC LIMIT 10`)
@@ -132,7 +151,7 @@ func enableCORS(w *http.ResponseWriter) {
     (*w).Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 }
 
-func insertEvent(db *sql.DB, event Event) error {
+func insertEvent(db *sql.DB, event Event) (error, int) {
     sqlStatement := `
         INSERT INTO events (name, value)
         VALUES ($1, $2)
@@ -141,9 +160,43 @@ func insertEvent(db *sql.DB, event Event) error {
     var eventID int
     err := db.QueryRow(sqlStatement, event.EventName, event.EventValue).Scan(&eventID)
     if err != nil {
-        return err
+        return err, 0
     }
 
     fmt.Printf("Inserted record with ID: %d\n", eventID)
-    return nil
+    return nil, eventID
+}
+
+func handleConnections(w http.ResponseWriter, r *http.Request) {
+    ws, err := upgrader.Upgrade(w, r, nil)
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer ws.Close()
+
+    clients[ws] = true
+
+    for {
+        var event Event
+        err := ws.ReadJSON(&event)
+        if err != nil {
+            delete(clients, ws)
+            break
+        }
+    }
+}
+
+func handleMessages() {
+    for {
+        event := <-broadcast
+
+        for client := range clients {
+            err := client.WriteJSON(event)
+            if err != nil {
+                log.Printf("error: %v", err)
+                client.Close()
+                delete(clients, client)
+            }
+        }
+    }
 }
