@@ -9,38 +9,6 @@
     <script>
       ga4ct.send("page_view");
     </script>
-    <script>
-      let socket = new WebSocket("ws://localhost:3000/ws");
-
-      socket.onmessage = function(event) {
-        let newEvent = JSON.parse(event.data);
-        let table = document.getElementById("eventsTable");
-        let newRow = table.insertRow(1);
-        let cell1 = newRow.insertCell(0);
-        let cell2 = newRow.insertCell(1);
-        let cell3 = newRow.insertCell(2);
-        cell1.innerHTML = newEvent.EventID;
-        cell2.innerHTML = newEvent.EventName;
-        cell3.innerHTML = newEvent.EventValue;
-
-        // Remove the last row if there are more than 10 rows
-        if (table.rows.length > 11) {
-          table.deleteRow(11);
-        }
-      };
-
-      socket.onopen = function(event) {
-        console.log("WebSocket is open now.");
-      };
-
-      socket.onclose = function(event) {
-        console.log("WebSocket is closed now.");
-      };
-
-      socket.onerror = function(error) {
-        console.error("WebSocket error observed:", error);
-      };
-    </script>
   </head>
   <body>
       <h1>Welcome to My Website - Index Page</h1>

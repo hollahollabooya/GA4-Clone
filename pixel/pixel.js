@@ -2,7 +2,7 @@ window.ga4ct = {
 	// Helpful values
 	SESSION_EXPIRATION: 1800000, // 30 minutes in milliseconds
 	MAX_EPIRATION: 46656000000, // 540 days in milliseconds
-	DOMAIN: document.domain.split('.').reverse().splice(0,2).reverse().join('.'), // root domain
+	DOMAIN: document.location.hostname.split('.').reverse().splice(0,2).reverse().join('.'), // root domain
 	CID_COOKIE_NAME: "_ga4ct_cid",
 	SID_COOKIE_NAME: "_ga4ct_sid",
 	CID_PREFIX: "GA4CT.CID.",
@@ -43,13 +43,16 @@ window.ga4ct = {
 			ga4ct.extendSessionId();
 		}
 
-		// Looks like we should use XMLHttpRequest
-		// https://developer.mozilla.org/en-US/docs/Web/API/XMLHttpRequest
-		// https://www.w3schools.com/xml/xml_http.asp
-		const xhr = new XMLHttpRequest();
-		xhr.open('POST', ga4ct.SEND_ENDPOINT, true);
-		xhr.setRequestHeader('Content-Type', 'application/json');
-		xhr.send(JSON.stringify({ 'EventName': event_name, 'EventValue':  event_value }));
+		fetch(ga4ct.SEND_ENDPOINT, {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json"
+			},
+			body: JSON.stringify({
+				"EventName": event_name, 
+				"EventValue":  event_value 
+			})
+		})
 	},
 
 	// Functions for managing device, session ID
