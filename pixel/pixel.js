@@ -9,6 +9,7 @@ window.ga4ct = {
 	SID_PREFIX: "GA4CT.SID.",
 	CID_REGEX: /^GA4CT\.CID\.\d+\.\d+$/,
 	SID_REGEX: /^GA4CT\.SID\.\d+\.\d+$/,
+	AID_REGEX: /^GA4CT-\d+$/,
 	SEND_ENDPOINT: "http://localhost:3000/event",
 
 	// Helper functions
@@ -29,8 +30,21 @@ window.ga4ct = {
 		return Math.floor(Math.random() * 0x7FFFFFFF) + "." + Math.floor(Date.now() / 1000);
 	},
 
+	init: function (account_id) {
+		ga4ct.ACCOUNT_ID = account_id;
+		if(!ga4ct.validateAccountId()) {
+			console.log("GA4CT Error: Invalid Account ID format.")
+		}
+		console.log(navigator.userAgent)
+		console.log(navigator.userAgentData)
+	},
 	// I'll only allow event name and value for now and may extend to optional parameters later
-	send: function (event_name, event_value = null) {
+	send: function (event_name, event_value = 0) {
+		if(!ga4ct.validateAccountId()) {
+			console.log("GA4CT Error: Initialize GA4CT before sending events.");
+			return
+		}
+
 		// Check if CID and SID are set. If not, set new ones
 		if(!ga4ct.validateClientId()) {
 			ga4ct.newClientId();
@@ -43,19 +57,37 @@ window.ga4ct = {
 			ga4ct.extendSessionId();
 		}
 
+		// If cookies were unable to be written, don't send events.
+		if(!ga4ct.validateClientId() || !ga4ct.validateSessionId()) {
+			console.log("GA4CT Error: Client ID or Session ID is not set.");
+			return
+		}
+
 		fetch(ga4ct.SEND_ENDPOINT, {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json"
 			},
 			body: JSON.stringify({
-				"EventName": event_name, 
-				"EventValue":  event_value 
+				"account_id": ga4ct.ACCOUNT_ID,
+				"client_id": ga4ct.getClientId(),
+				"session_id": ga4ct.getSessionId(),
+				"event_name": event_name, 
+				"event_value": event_value, 
+				"timestamp": new Date().toISOString(),
+				"page_location": document.location.href,
+				"page_title": document.title,
+				"page_referrer": document.referrer,
+				"user_agent": navigator.userAgent,
+				"screen_resolution": window.screen.width + "x" + window.screen.height
 			})
 		})
 	},
 
 	// Functions for managing device, session ID
+	validateAccountId: function () {
+		return ga4ct.AID_REGEX.test(ga4ct.ACCOUNT_ID);
+	},
 	validateClientId: function () {
 		return ga4ct.CID_REGEX.test(ga4ct.getClientId());
 	},

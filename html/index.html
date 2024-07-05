@@ -7,6 +7,7 @@
     <title>Website Index</title>
     <script src="../pixel/pixel.js"></script>
     <script>
+      ga4ct.init("GA4CT-1");
       ga4ct.send("page_view");
     </script>
   </head>
@@ -26,9 +27,9 @@
         </tr>
         {{range .events}}
         <tr>
-            <td>{{.EventID}}</td>
-            <td>{{.EventName}}</td>
-            <td>{{.EventValue}}</td>
+            <td>{{.ID}}</td>
+            <td>{{.Name}}</td>
+            <td>{{.Value}}</td>
         </tr>
         {{end}}
       </table>

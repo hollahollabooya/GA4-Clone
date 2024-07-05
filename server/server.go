@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
@@ -18,9 +19,18 @@ import (
  * I don't know how to get around that but that's how we'll do it for now
  */
 type Event struct {
-	EventID    int
-	EventName  string
-	EventValue float64
+	ID               int       `json:"-"`
+	AccountID        string    `json:"account_id"`
+	ClientID         string    `json:"client_id"`
+	SessionID        string    `json:"session_id"`
+	Name             string    `json:"event_name"`
+	Value            float64   `json:"event_value"`
+	Timestamp        time.Time `json:"timestamp"`
+	PageLocation     string    `json:"page_location"`
+	PageTitle        string    `json:"page_title"`
+	PageReferrer     string    `json:"page_referrer"`
+	UserAgent        string    `json:"user_agent"`
+	ScreenResolution string    `json:"screen_resolution"`
 }
 
 func main() {
@@ -61,12 +71,6 @@ func main() {
 
 	// Handler function for storing events from pixel
 	http.HandleFunc("/event", func(w http.ResponseWriter, r *http.Request) {
-		enableCORS(&w)
-
-		if r.Method == http.MethodOptions {
-			w.WriteHeader(http.StatusOK)
-			return
-		}
 		if r.Method != http.MethodPost {
 			http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
 			return
@@ -80,17 +84,51 @@ func main() {
 			return
 		}
 
+		// I need to insert some logic to truncate the string fields here so things don't get too brazy
+
+		// fmt.Printf("IP: %+v\n", r.RemoteAddr)
 		fmt.Printf("Event: %+v \n", event)
 
 		// Insert the event into the DB
-		event.EventID, err = insertEvent(db, event)
+		sqlStatement := `
+        INSERT INTO events (
+			account_id,
+			client_id,
+			session_id,
+			name, 
+			value, 
+			timestamp,
+			page_location,
+			page_title,
+			page_referrer,
+			user_agent,
+			screen_resolution
+		)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        RETURNING id`
+
+		var eventID int
+		err := db.QueryRow(sqlStatement, event.AccountID, event.ClientID, event.SessionID,
+			event.Name, event.Value, event.Timestamp, event.PageLocation, event.PageTitle,
+			event.PageReferrer, event.UserAgent, event.ScreenResolution).Scan(&eventID)
 		if err != nil {
 			log.Fatal(err)
 		}
+
+		fmt.Printf("Inserted record with ID: %d\n", eventID)
 	})
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		rows, err := db.Query(`SELECT * FROM events ORDER BY id DESC LIMIT 10`)
+		sqlStatement := `
+        SELECT
+			id,
+			name,
+			value 
+		FROM events
+		ORDER BY id DESC
+		LIMIT 10`
+
+		rows, err := db.Query(sqlStatement)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -100,7 +138,7 @@ func main() {
 		var events []Event
 		for rows.Next() {
 			var event Event
-			if err := rows.Scan(&event.EventID, &event.EventName, &event.EventValue); err != nil {
+			if err := rows.Scan(&event.ID, &event.Name, &event.Value); err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
@@ -120,26 +158,4 @@ func main() {
 
 	fmt.Println("Server is running on http://localhost:3000")
 	log.Fatal(http.ListenAndServe(":3000", nil))
-}
-
-func enableCORS(w *http.ResponseWriter) {
-	(*w).Header().Set("Access-Control-Allow-Origin", "*")
-	(*w).Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
-	(*w).Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
-}
-
-func insertEvent(db *sql.DB, event Event) (int, error) {
-	sqlStatement := `
-        INSERT INTO events (name, value)
-        VALUES ($1, $2)
-        RETURNING id`
-
-	var eventID int
-	err := db.QueryRow(sqlStatement, event.EventName, event.EventValue).Scan(&eventID)
-	if err != nil {
-		return 0, err
-	}
-
-	fmt.Printf("Inserted record with ID: %d\n", eventID)
-	return eventID, nil
 }
