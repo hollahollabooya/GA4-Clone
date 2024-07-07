@@ -35,8 +35,6 @@ window.ga4ct = {
 		if(!ga4ct.validateAccountId()) {
 			console.log("GA4CT Error: Invalid Account ID format.")
 		}
-		console.log(navigator.userAgent)
-		console.log(navigator.userAgentData)
 	},
 	// I'll only allow event name and value for now and may extend to optional parameters later
 	send: function (event_name, event_value = 0) {

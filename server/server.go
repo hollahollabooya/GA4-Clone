@@ -4,34 +4,17 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"html/template"
 	"log"
 	"net/http"
 	"os"
 	"strconv"
-	"time"
 
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
-)
 
-/* The key names here need to match the key names in the JSON object exactly
- * I don't know how to get around that but that's how we'll do it for now
- */
-type Event struct {
-	ID               int       `json:"-"`
-	AccountID        string    `json:"account_id"`
-	ClientID         string    `json:"client_id"`
-	SessionID        string    `json:"session_id"`
-	Name             string    `json:"event_name"`
-	Value            float64   `json:"event_value"`
-	Timestamp        time.Time `json:"timestamp"`
-	PageLocation     string    `json:"page_location"`
-	PageTitle        string    `json:"page_title"`
-	PageReferrer     string    `json:"page_referrer"`
-	UserAgent        string    `json:"user_agent"`
-	ScreenResolution string    `json:"screen_resolution"`
-}
+	"ga4ct/event"
+	"ga4ct/templates"
+)
 
 func main() {
 	// Load the environment credentials
@@ -77,7 +60,7 @@ func main() {
 		}
 
 		// Read the request body
-		var event Event
+		var event event.Event
 		err = json.NewDecoder(r.Body).Decode(&event)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
@@ -86,7 +69,6 @@ func main() {
 
 		// I need to insert some logic to truncate the string fields here so things don't get too brazy
 
-		// fmt.Printf("IP: %+v\n", r.RemoteAddr)
 		fmt.Printf("Event: %+v \n", event)
 
 		// Insert the event into the DB
@@ -135,9 +117,9 @@ func main() {
 		}
 		defer rows.Close()
 
-		var events []Event
+		var events []event.Event
 		for rows.Next() {
-			var event Event
+			var event event.Event
 			if err := rows.Scan(&event.ID, &event.Name, &event.Value); err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
@@ -149,11 +131,10 @@ func main() {
 			return
 		}
 
-		tmpl := template.Must(template.ParseFiles("../html/index.html"))
-		tmpl.Execute(w, map[string]interface{}{"events": events})
+		templates.Index(events).Render(r.Context(), w)
 	})
 
-	pixelFs := http.FileServer(http.Dir("../pixel"))
+	pixelFs := http.FileServer(http.Dir("./pixel"))
 	http.Handle("/pixel/", http.StripPrefix("/pixel", pixelFs))
 
 	fmt.Println("Server is running on http://localhost:3000")

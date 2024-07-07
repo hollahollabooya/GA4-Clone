@@ -1,1 +1,3 @@
-/server/.env
+.env
+*_templ.go
+*.exe
