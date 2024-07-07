@@ -140,6 +140,9 @@ func main() {
 	assetsFs := http.FileServer(http.Dir("./assets"))
 	http.Handle("/assets/", http.StripPrefix("/assets", assetsFs))
 
+	jsFs := http.FileServer(http.Dir("./node_modules"))
+	http.Handle("/node_modules/", http.StripPrefix("/node_modules", jsFs))
+
 	fmt.Println("Server is running on http://localhost:3000")
 	log.Fatal(http.ListenAndServe(":3000", nil))
 }

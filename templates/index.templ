@@ -7,12 +7,13 @@ templ Index(events []event.Event) {
     <html>
     <head>
         <title>Website Index</title>
-        <script src="/pixel/pixel.js"></script>
+        <script src="/node_modules/chart.js/dist/chart.umd.js"></script>
         <link href="/assets/output.css" rel="stylesheet">
-        <script>
-            ga4ct.init("GA4CT-1");
-            ga4ct.send("page_view");
-        </script>
+        // <script src="/pixel/pixel.js"></script>
+        // <script>
+        //     ga4ct.init("GA4CT-1");
+        //     ga4ct.send("page_view");
+        // </script>
     </head>
     <body>
         @reportLayout(events)
@@ -25,14 +26,41 @@ templ reportLayout(events []event.Event) {
         @lineChart()
         @barChart()
     </div>
-    <div id="events-table-container" class="container mx-auto">
-    @eventsTable(events)
+    <div id="events-table-container" class="container mx-auto columns-1">
+        @eventsTable(events)
     </div>
 }
 
 templ lineChart() {
     <div id="line-chart">
-        <p>"A line chart will go here"</p>
+        <canvas id="time-series"></canvas>
+        <script>
+            const data = [
+                { year: 2010, count: 10 },
+                { year: 2011, count: 20 },
+                { year: 2012, count: 15 },
+                { year: 2013, count: 25 },
+                { year: 2014, count: 22 },
+                { year: 2015, count: 30 },
+                { year: 2016, count: 28 },
+            ];
+
+            new Chart(
+                document.getElementById('time-series'),
+                {
+                type: 'bar',
+                data: {
+                    labels: data.map(row => row.year),
+                    datasets: [
+                    {
+                        label: 'Acquisitions by year',
+                        data: data.map(row => row.count)
+                    }
+                    ]
+                }
+                }
+            );
+        </script>
     </div>
 }
 
