@@ -8,6 +8,7 @@ templ Index(events []event.Event) {
     <head>
         <title>Website Index</title>
         <script src="/pixel/pixel.js"></script>
+        <link href="/assets/output.css" rel="stylesheet">
         <script>
             ga4ct.init("GA4CT-1");
             ga4ct.send("page_view");
@@ -20,10 +21,12 @@ templ Index(events []event.Event) {
 }
 
 templ reportLayout(events []event.Event) {
-    <div id="reports-container">
+    <div id="reports-container" class="container mx-auto columns-2">
         @lineChart()
         @barChart()
-        @eventsTable(events)
+    </div>
+    <div id="events-table-container" class="container mx-auto">
+    @eventsTable(events)
     </div>
 }
 

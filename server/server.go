@@ -137,6 +137,9 @@ func main() {
 	pixelFs := http.FileServer(http.Dir("./pixel"))
 	http.Handle("/pixel/", http.StripPrefix("/pixel", pixelFs))
 
+	assetsFs := http.FileServer(http.Dir("./assets"))
+	http.Handle("/assets/", http.StripPrefix("/assets", assetsFs))
+
 	fmt.Println("Server is running on http://localhost:3000")
 	log.Fatal(http.ListenAndServe(":3000", nil))
 }
