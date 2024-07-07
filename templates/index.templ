@@ -14,27 +14,44 @@ templ Index(events []event.Event) {
         </script>
     </head>
     <body>
-        <h1>Welcome to My Website - Index Page</h1>
-        <button onclick="sendEvent();">Click me</button>
-        <script>
-            function sendEvent() {
-                ga4ct.send("button_click", 10);
-            }
-        </script>
-        <table id="eventsTable" border="1">
-            <tr>
-                <th>ID</th>
-                <th>Event Name</th>
-                <th>Event Value</th>
-            </tr>
-            for _, event := range events {
-            <tr>
-                <td>{ fmt.Sprintf("%v", event.ID) }</td>
-                <td>{ event.Name }</td>
-                <td>{ fmt.Sprintf("%v", event.Value) }</td>
-            </tr>
-            }
-        </table>
+        @reportLayout(events)
     </body>
     </html>
+}
+
+templ reportLayout(events []event.Event) {
+    <div id="reports-container">
+        @lineChart()
+        @barChart()
+        @eventsTable(events)
+    </div>
+}
+
+templ lineChart() {
+    <div id="line-chart">
+        <p>"A line chart will go here"</p>
+    </div>
+}
+
+templ barChart() {
+    <div id="bar-chart">
+        <p>"A bar chart will go here"</p>
+    </div>
+}
+
+templ eventsTable(events []event.Event) {
+    <table id="eventsTable" border="1">
+        <tr>
+            <th>ID</th>
+            <th>Event Name</th>
+            <th>Event Value</th>
+        </tr>
+        for _, event := range events {
+        <tr>
+            <td>{ fmt.Sprintf("%v", event.ID) }</td>
+            <td>{ event.Name }</td>
+            <td>{ fmt.Sprintf("%v", event.Value) }</td>
+        </tr>
+        }
+    </table>
 }
