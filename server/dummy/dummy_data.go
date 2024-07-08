@@ -11,61 +11,28 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
+	"github.com/lib/pq"
+	_ "github.com/lib/pq"
 )
-
-func connctDB() {
-	// Load the environment credentials
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("Error loading .env file")
-	}
-
-	// Read database credentials from environment variables
-	host := os.Getenv("DB_HOST")
-	portStr := os.Getenv("DB_PORT")
-	user := os.Getenv("DB_USER")
-	password := os.Getenv("DB_PASSWORD")
-	dbname := os.Getenv("DB_NAME")
-
-	port, err := strconv.Atoi(portStr)
-	if err != nil {
-		log.Fatalf("Invalid port number: %v", portStr)
-	}
-
-	// Setup database connection
-	connStr := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
-		host, port, user, password, dbname)
-
-	db, err := sql.Open("postgres", connStr)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer db.Close()
-
-	err = db.Ping()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	fmt.Println("Successfully connected to the database")
-}
 
 func makeDummyData(numUsers int, avgSessionsPerUser float64, avgEventsPerSession float64,
 	startTime time.Time, endTime time.Time) *[]event.Event {
 
 	accountId := "GA4CT-1"
 	hostname := "https://www.example.com"
-	// name := []string{
-	// 	"page_view",
-	// 	"cta_click",
-	// 	"form_submission",
-	// 	"purchase",
-	// }
+	names := []string{
+		"page_view",
+		"cta_click",
+		"form_submission",
+		"purchase",
+	}
 
-	pages := []struct {
+	type Page struct {
 		Path  string
 		Title string
-	}{
+	}
+
+	pages := []Page{
 		{"/", "Storefront | We Sell Products | Example"},
 		{"/collection", "Product Collection | Example"},
 		{"/product-a", "Product A | Example"},
@@ -76,13 +43,15 @@ func makeDummyData(numUsers int, avgSessionsPerUser float64, avgEventsPerSession
 		{"/checkout", "Checkout | Example"},
 	}
 
-	// purchase_page := "/order-confirmation"
-	// lead_form_page := "/contact-thank-you"
+	purchase_page := Page{"/order-confirmation", "Order Confirmation | Example"}
+	lead_form_page := Page{"/contact-thank-you", "Thank You For Contacting Us | Example"}
 
-	agents := []struct {
+	type Agent struct {
 		UserAgent        string
 		ScreenResolution string
-	}{
+	}
+
+	agents := []Agent{
 		// Chrome, Desktop, Windows
 		{
 			"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
@@ -191,13 +160,15 @@ func makeDummyData(numUsers int, avgSessionsPerUser float64, avgEventsPerSession
 	}
 
 	type User struct {
-		ID               string
-		FirstSessionTime time.Time
+		ID                   string
+		LastSessionStartTime time.Time
+		Agent                Agent
 	}
 
 	type Session struct {
 		ID               string
 		SessionStartTime time.Time
+		User             *User
 	}
 
 	users := make([]User, numUsers)
@@ -211,11 +182,21 @@ func makeDummyData(numUsers int, avgSessionsPerUser float64, avgEventsPerSession
 	// Add the first landing page views for every user
 	for i := 0; i < numUsers; i++ {
 		timestamp := randomTimeBetween(startTime, endTime)
-		users[i] = User{ID: "GA4CT.CID." + generateRandomID(timestamp), FirstSessionTime: timestamp}
-		sessions[i] = Session{ID: "GA4CT.SID." + generateRandomID(timestamp), SessionStartTime: timestamp}
+
+		agent := agents[rand.Intn(len(agents))]
+
+		users[i] = User{
+			ID:                   "GA4CT.CID." + generateRandomID(timestamp),
+			LastSessionStartTime: timestamp,
+			Agent:                agent,
+		}
+		sessions[i] = Session{
+			ID:               "GA4CT.SID." + generateRandomID(timestamp),
+			SessionStartTime: timestamp,
+			User:             &users[i],
+		}
 
 		page := pages[rand.Intn(len(pages))]
-		agent := agents[rand.Intn(len(agents))]
 		channel := channels[rand.Intn(len(channels))]
 		referrer := channelsMap[channel].referrers[rand.Intn(len(channelsMap[channel].referrers))]
 		query := channelsMap[channel].query[rand.Intn(len(channelsMap[channel].query))]
@@ -230,16 +211,85 @@ func makeDummyData(numUsers int, avgSessionsPerUser float64, avgEventsPerSession
 			PageLocation:     hostname + page.Path + query,
 			PageTitle:        page.Title,
 			PageReferrer:     referrer,
-			UserAgent:        agent.UserAgent,
-			ScreenResolution: agent.ScreenResolution,
+			UserAgent:        users[i].Agent.UserAgent,
+			ScreenResolution: users[i].Agent.ScreenResolution,
 		}
 	}
 
 	// Add the first landing page views for repeat sessions
-	// Repeat sessions need to come after first user session
+	// We'll say repeat sessions happen in a 30-day window at least one day after the most recent session
+	for i := numUsers; i < totalSessionsCount; i++ {
+		user := users[rand.Intn(len(users))]
+
+		timestamp := randomTimeBetween(user.LastSessionStartTime.Add(time.Hour*24), user.LastSessionStartTime.Add(time.Hour*24*31))
+		user.LastSessionStartTime = timestamp
+
+		sessions[i] = Session{
+			ID:               "GA4CT.SID." + generateRandomID(timestamp),
+			SessionStartTime: timestamp,
+			User:             &user,
+		}
+
+		page := pages[rand.Intn(len(pages))]
+		channel := channels[rand.Intn(len(channels))]
+		referrer := channelsMap[channel].referrers[rand.Intn(len(channelsMap[channel].referrers))]
+		query := channelsMap[channel].query[rand.Intn(len(channelsMap[channel].query))]
+
+		events[i] = event.Event{
+			AccountID:        accountId,
+			ClientID:         user.ID,
+			SessionID:        sessions[i].ID,
+			Name:             "page_view",
+			Value:            0,
+			Timestamp:        timestamp,
+			PageLocation:     hostname + page.Path + query,
+			PageTitle:        page.Title,
+			PageReferrer:     referrer,
+			UserAgent:        user.Agent.UserAgent,
+			ScreenResolution: user.Agent.ScreenResolution,
+		}
+	}
 
 	// Fill the remaining event space with random events
 	// Events in the same session need to be within 30 minutes of the first event in the session
+	for i := totalSessionsCount; i < totalEventCount; i++ {
+		session := sessions[rand.Intn(len(sessions))]
+
+		timestamp := randomTimeBetween(session.SessionStartTime, session.SessionStartTime.Add(time.Minute*30))
+
+		name := names[rand.Intn(len(names))]
+
+		var page Page
+		var value float64
+
+		switch name {
+		case "purchase":
+			page = purchase_page
+			value = float64(int(rand.Float64()*300*100)) / 100
+		case "form_submission":
+			page = lead_form_page
+			value = 0
+		default:
+			page = pages[rand.Intn(len(pages))]
+			value = 0
+		}
+
+		referrer := pages[rand.Intn(len(pages))]
+
+		events[i] = event.Event{
+			AccountID:        accountId,
+			ClientID:         session.User.ID,
+			SessionID:        session.ID,
+			Name:             name,
+			Value:            value,
+			Timestamp:        timestamp,
+			PageLocation:     hostname + page.Path,
+			PageTitle:        page.Title,
+			PageReferrer:     hostname + referrer.Path,
+			UserAgent:        session.User.Agent.UserAgent,
+			ScreenResolution: session.User.Agent.ScreenResolution,
+		}
+	}
 
 	return &events
 }
@@ -259,7 +309,96 @@ func generateRandomID(timestamp time.Time) string {
 func main() {
 	rand.Seed(time.Now().UnixNano())
 
-	events := makeDummyData(1, 2.5, 5.15, time.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC), time.Date(2023, 12, 31, 23, 59, 99, 0, time.UTC))
+	events := makeDummyData(12000, 2.5, 5.5, time.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC), time.Date(2023, 12, 31, 23, 59, 99, 0, time.UTC))
 
-	fmt.Printf("%v\n", *events)
+	// Load the environment credentials
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
+
+	// Read database credentials from environment variables
+	host := os.Getenv("DB_HOST")
+	portStr := os.Getenv("DB_PORT")
+	user := os.Getenv("DB_USER")
+	password := os.Getenv("DB_PASSWORD")
+	dbname := os.Getenv("DB_NAME")
+
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		log.Fatalf("Invalid port number: %v", portStr)
+	}
+
+	// Setup database connection
+	connStr := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
+		host, port, user, password, dbname)
+
+	db, err := sql.Open("postgres", connStr)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	err = db.Ping()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println("Successfully connected to the database")
+
+	// insert the new data
+	txn, err := db.Begin()
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer txn.Rollback()
+
+	stmt, err := txn.Prepare(pq.CopyIn(
+		"events",
+		"account_id",
+		"client_id",
+		"session_id",
+		"name",
+		"value",
+		"timestamp",
+		"page_location",
+		"page_title",
+		"page_referrer",
+		"user_agent",
+		"screen_resolution",
+	))
+	defer stmt.Close()
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for _, event := range *events {
+		_, err = stmt.Exec(
+			event.AccountID,
+			event.ClientID,
+			event.SessionID,
+			event.Name,
+			event.Value,
+			event.Timestamp,
+			event.PageLocation,
+			event.PageTitle,
+			event.PageReferrer,
+			event.UserAgent,
+			event.ScreenResolution,
+		)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	_, err = stmt.Exec()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = txn.Commit()
+	if err != nil {
+		log.Fatal(err)
+	}
 }
