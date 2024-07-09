@@ -12,7 +12,7 @@ import (
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 
-	"ga4ct/event"
+	"ga4ct/data"
 	"ga4ct/templates"
 )
 
@@ -60,7 +60,7 @@ func main() {
 		}
 
 		// Read the request body
-		var event event.Event
+		var event data.Event
 		err = json.NewDecoder(r.Body).Decode(&event)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
@@ -101,37 +101,38 @@ func main() {
 	})
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		sqlStatement := `
-        SELECT
-			id,
-			name,
-			value 
-		FROM events
-		ORDER BY id DESC
-		LIMIT 10`
 
-		rows, err := db.Query(sqlStatement)
+		// Get the aggregated data by date
+		lineChartStmt := `
+			SELECT
+				TO_CHAR(timestamp, 'YYYY-MM-DD') as date,
+				COUNT(*) as event_count
+			FROM events
+			WHERE timestamp BETWEEN '2023-01-01' AND '2023-01-30'
+			GROUP BY 1`
+
+		lineChartData, err := data.RetrieveSQL2(db, lineChartStmt)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		defer rows.Close()
 
-		var events []event.Event
-		for rows.Next() {
-			var event event.Event
-			if err := rows.Scan(&event.ID, &event.Name, &event.Value); err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-			events = append(events, event)
-		}
-		if err := rows.Err(); err != nil {
+		// Get the aggregated date by event name
+		barChartStmt := `
+			SELECT
+				name,
+				COUNT(*) as event_count
+			FROM events
+			WHERE timestamp BETWEEN '2023-01-01' AND '2023-01-30'
+			GROUP BY 1`
+
+		barChartData, err := data.RetrieveSQL2(db, barChartStmt)
+		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
-		templates.Index(events).Render(r.Context(), w)
+		templates.Index(lineChartData, barChartData).Render(r.Context(), w)
 	})
 
 	pixelFs := http.FileServer(http.Dir("./pixel"))

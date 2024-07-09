@@ -3,7 +3,7 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	"ga4ct/event"
+	"ga4ct/data"
 	"log"
 	"math/rand"
 	"os"
@@ -12,11 +12,10 @@ import (
 
 	"github.com/joho/godotenv"
 	"github.com/lib/pq"
-	_ "github.com/lib/pq"
 )
 
 func makeDummyData(numUsers int, avgSessionsPerUser float64, avgEventsPerSession float64,
-	startTime time.Time, endTime time.Time) *[]event.Event {
+	startTime time.Time, endTime time.Time) *[]data.Event {
 
 	accountId := "GA4CT-1"
 	hostname := "https://www.example.com"
@@ -177,7 +176,7 @@ func makeDummyData(numUsers int, avgSessionsPerUser float64, avgEventsPerSession
 	sessions := make([]Session, totalSessionsCount)
 
 	totalEventCount := int(float64(numUsers) * avgSessionsPerUser * avgEventsPerSession)
-	events := make([]event.Event, totalEventCount)
+	events := make([]data.Event, totalEventCount)
 
 	// Add the first landing page views for every user
 	for i := 0; i < numUsers; i++ {
@@ -201,7 +200,7 @@ func makeDummyData(numUsers int, avgSessionsPerUser float64, avgEventsPerSession
 		referrer := channelsMap[channel].referrers[rand.Intn(len(channelsMap[channel].referrers))]
 		query := channelsMap[channel].query[rand.Intn(len(channelsMap[channel].query))]
 
-		events[i] = event.Event{
+		events[i] = data.Event{
 			AccountID:        accountId,
 			ClientID:         users[i].ID,
 			SessionID:        sessions[i].ID,
@@ -235,7 +234,7 @@ func makeDummyData(numUsers int, avgSessionsPerUser float64, avgEventsPerSession
 		referrer := channelsMap[channel].referrers[rand.Intn(len(channelsMap[channel].referrers))]
 		query := channelsMap[channel].query[rand.Intn(len(channelsMap[channel].query))]
 
-		events[i] = event.Event{
+		events[i] = data.Event{
 			AccountID:        accountId,
 			ClientID:         user.ID,
 			SessionID:        sessions[i].ID,
@@ -276,7 +275,7 @@ func makeDummyData(numUsers int, avgSessionsPerUser float64, avgEventsPerSession
 
 		referrer := pages[rand.Intn(len(pages))]
 
-		events[i] = event.Event{
+		events[i] = data.Event{
 			AccountID:        accountId,
 			ClientID:         session.User.ID,
 			SessionID:        session.ID,
@@ -307,8 +306,6 @@ func generateRandomID(timestamp time.Time) string {
 }
 
 func main() {
-	rand.Seed(time.Now().UnixNano())
-
 	events := makeDummyData(12000, 2.5, 5.5, time.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC), time.Date(2023, 12, 31, 23, 59, 99, 0, time.UTC))
 
 	// Load the environment credentials
@@ -367,11 +364,10 @@ func main() {
 		"user_agent",
 		"screen_resolution",
 	))
-	defer stmt.Close()
-
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer stmt.Close()
 
 	for _, event := range *events {
 		_, err = stmt.Exec(

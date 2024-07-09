@@ -1,9 +1,9 @@
 package templates
 
-import "ga4ct/event"
+import "ga4ct/data"
 import "fmt"
 
-templ Index(events []event.Event) {
+templ Index(lineChartData, barChartData *[]data.DataPoint) {
     <html>
     <head>
         <title>Website Index</title>
@@ -16,24 +16,28 @@ templ Index(events []event.Event) {
         // </script>
     </head>
     <body>
-        @reportLayout(events)
+        @reportLayout(lineChartData, barChartData)
     </body>
     </html>
 }
 
-templ reportLayout(events []event.Event) {
+templ reportLayout(lineChartData, barChartData *[]data.DataPoint) {
     <div id="reports-container" class="container mx-auto columns-2">
-        @lineChart()
-        @barChart()
+        @lineChart(lineChartData)
+        @barChart(barChartData)
     </div>
     <div id="events-table-container" class="container mx-auto columns-1">
-        @eventsTable(events)
+        @eventsTable(barChartData)
     </div>
 }
 
-templ lineChart() {
+templ lineChart(data *[]data.DataPoint) {
     <div id="line-chart">
         <canvas id="time-series"></canvas>
+        // Use this to pass down the data to the client
+        // https://templ.guide/syntax-and-usage/script-templates#pass-server-side-data-to-the-client-in-a-script-element
+        @templ.JSONScript("line-chart-data", *data)
+
         <script>
             const data = [
                 { year: 2010, count: 10 },
@@ -64,24 +68,22 @@ templ lineChart() {
     </div>
 }
 
-templ barChart() {
+templ barChart(data *[]data.DataPoint) {
     <div id="bar-chart">
         <p>"A bar chart will go here"</p>
     </div>
 }
 
-templ eventsTable(events []event.Event) {
-    <table id="eventsTable" border="1">
+templ eventsTable(data *[]data.DataPoint) {
+    <table id="table" border="1">
         <tr>
-            <th>ID</th>
             <th>Event Name</th>
-            <th>Event Value</th>
+            <th>Event Count</th>
         </tr>
-        for _, event := range events {
+        for _, dataPoint := range *data {
         <tr>
-            <td>{ fmt.Sprintf("%v", event.ID) }</td>
-            <td>{ event.Name }</td>
-            <td>{ fmt.Sprintf("%v", event.Value) }</td>
+            <td>{ dataPoint.Label }</td>
+            <td>{ fmt.Sprintf("%d", dataPoint.Value) }</td>
         </tr>
         }
     </table>
