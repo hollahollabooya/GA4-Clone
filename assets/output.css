@@ -597,6 +597,11 @@ video {
   display: table;
 }
 
+.columns-1 {
+  -moz-columns: 1;
+       columns: 1;
+}
+
 .columns-2 {
   -moz-columns: 2;
        columns: 2;

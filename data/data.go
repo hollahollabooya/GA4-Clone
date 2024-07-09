@@ -30,33 +30,33 @@ type Event struct {
 
 type ModeledDimension struct {
 	Label string
-	SQL   string
+	sql   string
 }
 
 type ModeledMeasure struct {
 	Label string
-	SQL   string
+	sql   string
 }
 
 var (
 	EventName = ModeledDimension{
 		Label: "Event Name",
-		SQL:   `name`,
+		sql:   `name`,
 	}
 	Date = ModeledDimension{
 		Label: "Date",
-		SQL:   `TO_CHAR(timestamp, 'YYYY-MM-DD')`,
+		sql:   `TO_CHAR(timestamp, 'YYYY-MM-DD')`,
 	}
 )
 
 var (
 	EventCount = ModeledMeasure{
 		Label: "Event Count",
-		SQL:   `COUNT(*)`,
+		sql:   `COUNT(*)`,
 	}
 	EventValue = ModeledMeasure{
 		Label: "Event Value",
-		SQL:   `ROUND(SUM(value),2)`,
+		sql:   `ROUND(SUM(value),2)`,
 	}
 )
 
@@ -69,31 +69,10 @@ type Row struct {
 	Measures   []Measure
 }
 
-type DataPoint struct {
-	Label string
-	Value int
-}
-
-func RetrieveSQL2(db *sql.DB, sqlStmt string) (*[]DataPoint, error) {
-	rows, err := db.Query(sqlStmt)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var data []DataPoint
-	for rows.Next() {
-		var dataPoint DataPoint
-		if err := rows.Scan(&dataPoint.Label, &dataPoint.Value); err != nil {
-			return nil, err
-		}
-		data = append(data, dataPoint)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-
-	return &data, nil
+type Table struct {
+	DimensionHeaders []ModeledDimension
+	MeasureHeaders   []ModeledMeasure
+	Rows             []Row
 }
 
 func buildSQL(dimensions []ModeledDimension, measures []ModeledMeasure, limit int) string {
@@ -105,14 +84,14 @@ func buildSQL(dimensions []ModeledDimension, measures []ModeledMeasure, limit in
 	}
 
 	for i, dimension := range dimensions {
-		sqlBuilder.WriteString(dimension.SQL)
+		sqlBuilder.WriteString(dimension.sql)
 		if !(i == len(dimensions)-1 && len(measures) == 0) {
 			sqlBuilder.WriteString(", ")
 		}
 	}
 
 	for i, measure := range measures {
-		sqlBuilder.WriteString(measure.SQL)
+		sqlBuilder.WriteString(measure.sql)
 		if i != len(measures)-1 {
 			sqlBuilder.WriteString(", ")
 		}
@@ -120,7 +99,7 @@ func buildSQL(dimensions []ModeledDimension, measures []ModeledMeasure, limit in
 
 	sqlBuilder.WriteString(" FROM events ")
 
-	if len(measures) == 0 {
+	if len(dimensions) == 0 {
 		sqlBuilder.WriteString(fmt.Sprintf(" LIMIT %d", limit))
 		return sqlBuilder.String()
 	}
@@ -138,7 +117,7 @@ func buildSQL(dimensions []ModeledDimension, measures []ModeledMeasure, limit in
 	return sqlBuilder.String()
 }
 
-func Retrieve(db *sql.DB, modeledDimensions []ModeledDimension, modeledMeasures []ModeledMeasure) (*[]Row, error) {
+func Retrieve(db *sql.DB, modeledDimensions []ModeledDimension, modeledMeasures []ModeledMeasure) (*Table, error) {
 	if len(modeledDimensions) == 0 && len(modeledMeasures) == 0 {
 		return nil, ErrNoResult
 	}
@@ -149,7 +128,10 @@ func Retrieve(db *sql.DB, modeledDimensions []ModeledDimension, modeledMeasures 
 	}
 	defer rows.Close()
 
-	var data []Row
+	table := Table{
+		DimensionHeaders: modeledDimensions,
+		MeasureHeaders:   modeledMeasures,
+	}
 	for rows.Next() {
 		row := Row{
 			Dimensions: make([]Dimension, len(modeledDimensions)),
@@ -167,11 +149,11 @@ func Retrieve(db *sql.DB, modeledDimensions []ModeledDimension, modeledMeasures 
 		if err := rows.Scan(scanVals...); err != nil {
 			return nil, err
 		}
-		data = append(data, row)
+		table.Rows = append(table.Rows, row)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
 
-	return &data, nil
+	return &table, nil
 }

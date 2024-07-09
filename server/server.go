@@ -103,33 +103,21 @@ func main() {
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 
 		// Get the aggregated data by date
-		lineChartStmt := `
-			SELECT
-				TO_CHAR(timestamp, 'YYYY-MM-DD') as date,
-				COUNT(*) as event_count
-			FROM events
-			WHERE timestamp BETWEEN '2023-01-01' AND '2023-01-30'
-			GROUP BY 1`
+		dimensions := []data.ModeledDimension{data.Date}
+		measures := []data.ModeledMeasure{data.EventCount}
 
-		lineChartData, err := data.RetrieveSQL2(db, lineChartStmt)
+		lineChartData, err := data.Retrieve(db, dimensions, measures)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
+			log.Fatal(err)
 		}
 
-		// Get the aggregated date by event name
-		barChartStmt := `
-			SELECT
-				name,
-				COUNT(*) as event_count
-			FROM events
-			WHERE timestamp BETWEEN '2023-01-01' AND '2023-01-30'
-			GROUP BY 1`
+		// Get the aggregated data by event name
+		dimensions = []data.ModeledDimension{data.EventName}
+		measures = []data.ModeledMeasure{data.EventCount}
 
-		barChartData, err := data.RetrieveSQL2(db, barChartStmt)
+		barChartData, err := data.Retrieve(db, dimensions, measures)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
+			log.Fatal(err)
 		}
 
 		templates.Index(lineChartData, barChartData).Render(r.Context(), w)

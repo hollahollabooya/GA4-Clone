@@ -48,7 +48,7 @@ func main() {
 	fmt.Println("Successfully connected to the database")
 
 	dimensions := []data.ModeledDimension{data.EventName}
-	measures := []data.ModeledMeasure{data.EventCount}
+	measures := []data.ModeledMeasure{}
 
 	rows, err := data.Retrieve(db, dimensions, measures)
 	if err != nil {

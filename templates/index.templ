@@ -3,7 +3,7 @@ package templates
 import "ga4ct/data"
 import "fmt"
 
-templ Index(lineChartData, barChartData *[]data.DataPoint) {
+templ Index(lineChartData, barChartData *data.Table) {
     <html>
     <head>
         <title>Website Index</title>
@@ -21,7 +21,7 @@ templ Index(lineChartData, barChartData *[]data.DataPoint) {
     </html>
 }
 
-templ reportLayout(lineChartData, barChartData *[]data.DataPoint) {
+templ reportLayout(lineChartData, barChartData *data.Table) {
     <div id="reports-container" class="container mx-auto columns-2">
         @lineChart(lineChartData)
         @barChart(barChartData)
@@ -31,12 +31,12 @@ templ reportLayout(lineChartData, barChartData *[]data.DataPoint) {
     </div>
 }
 
-templ lineChart(data *[]data.DataPoint) {
+templ lineChart(data *data.Table) {
     <div id="line-chart">
         <canvas id="time-series"></canvas>
         // Use this to pass down the data to the client
         // https://templ.guide/syntax-and-usage/script-templates#pass-server-side-data-to-the-client-in-a-script-element
-        @templ.JSONScript("line-chart-data", *data)
+        // @templ.JSONScript("line-chart-data", *data)
 
         <script>
             const data = [
@@ -68,22 +68,30 @@ templ lineChart(data *[]data.DataPoint) {
     </div>
 }
 
-templ barChart(data *[]data.DataPoint) {
+templ barChart(data *data.Table) {
     <div id="bar-chart">
         <p>"A bar chart will go here"</p>
     </div>
 }
 
-templ eventsTable(data *[]data.DataPoint) {
+templ eventsTable(data *data.Table) {
     <table id="table" border="1">
         <tr>
-            <th>Event Name</th>
-            <th>Event Count</th>
+        for _, dimensionHeader := range data.DimensionHeaders {
+            <th>{ dimensionHeader.Label }</th>
+        }
+        for _, measureHeader := range data.MeasureHeaders {
+            <th>{ measureHeader.Label }</th>
+        }
         </tr>
-        for _, dataPoint := range *data {
+        for _, row := range data.Rows {
         <tr>
-            <td>{ dataPoint.Label }</td>
-            <td>{ fmt.Sprintf("%d", dataPoint.Value) }</td>
+            for _, dimension := range row.Dimensions {
+                <td>{ string(dimension) }</td>
+            }
+            for _, measure := range row.Measures {
+                <td>{ fmt.Sprintf("%f", measure) }</td>
+            }
         </tr>
         }
     </table>
