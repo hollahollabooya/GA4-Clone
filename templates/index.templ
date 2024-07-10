@@ -7,8 +7,11 @@ templ Index(lineChartData, barChartData *data.Table) {
     <html>
     <head>
         <title>Website Index</title>
-        <script src="/node_modules/chart.js/dist/chart.umd.js"></script>
         <link href="/assets/output.css" rel="stylesheet">
+
+        // use charts.js cdn for now
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
         // <script src="/pixel/pixel.js"></script>
         // <script>
         //     ga4ct.init("GA4CT-1");
@@ -33,43 +36,34 @@ templ reportLayout(lineChartData, barChartData *data.Table) {
 
 templ lineChart(data *data.Table) {
     <div id="line-chart">
-        <canvas id="time-series"></canvas>
+        <canvas id="line-chart"></canvas>
         // Use this to pass down the data to the client
         // https://templ.guide/syntax-and-usage/script-templates#pass-server-side-data-to-the-client-in-a-script-element
-        // @templ.JSONScript("line-chart-data", *data)
 
+        @templ.JSONScript("line-chart-data", *data)
         <script>
-            const data = [
-                { year: 2010, count: 10 },
-                { year: 2011, count: 20 },
-                { year: 2012, count: 15 },
-                { year: 2013, count: 25 },
-                { year: 2014, count: 22 },
-                { year: 2015, count: 30 },
-                { year: 2016, count: 28 },
-            ];
+            let data = JSON.parse(document.getElementById("line-chart-data").textContent);
+            let ctx = document.getElementById("line-chart")
 
-            new Chart(
-                document.getElementById('time-series'),
-                {
-                type: 'bar',
+            new Chart (ctx, {
+                type: 'line',
                 data: {
-                    labels: data.map(row => row.year),
-                    datasets: [
-                    {
-                        label: 'Acquisitions by year',
-                        data: data.map(row => row.count)
+                    datasets: data.Rows
+                },
+                options: {
+                    parsing: {
+                        xAxisKey: 'Dimensions[0]',
+                        yAxisKey: 'Measures[0]'
                     }
-                    ]
                 }
-                }
-            );
+            });
         </script>
     </div>
 }
 
 templ barChart(data *data.Table) {
     <div id="bar-chart">
+        @templ.JSONScript("bar-chart-data", *data)
         <p>"A bar chart will go here"</p>
     </div>
 }

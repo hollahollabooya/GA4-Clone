@@ -1,4 +1,5 @@
 .env
 *_templ.go
 *.exe
+/assets/output.css
 /node_modules/*
