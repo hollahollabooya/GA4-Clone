@@ -1,0 +1,18 @@
+package templates
+
+// Simple page that loads the pixel for testing
+templ PixelPage() {
+    <html>
+    <head>
+        <title>Website Index</title>
+        <script src="/pixel/pixel.js"></script>
+        <script>
+            ga4ct.init("GA4CT-1");
+            ga4ct.send("page_view");
+        </script>
+    </head>
+    <body>
+        <p>Hello, world!</p>
+    </body>
+    </html>
+}

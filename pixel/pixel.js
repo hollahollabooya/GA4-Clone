@@ -10,7 +10,7 @@ window.ga4ct = {
 	CID_REGEX: /^GA4CT\.CID\.\d+\.\d+$/,
 	SID_REGEX: /^GA4CT\.SID\.\d+\.\d+$/,
 	AID_REGEX: /^GA4CT-\d+$/,
-	SEND_ENDPOINT: "http://localhost:3000/event",
+	SEND_ENDPOINT: "http://localhost:3000/collect",
 
 	// Helper functions
 	readCookie: function (name) {

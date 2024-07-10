@@ -2,16 +2,15 @@ package data
 
 import (
 	"database/sql"
-	"errors"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 )
-
-var ErrNoResult = errors.New("no results")
 
 type Event struct {
 	ID               int       `json:"-"`
@@ -26,6 +25,74 @@ type Event struct {
 	PageReferrer     string    `json:"page_referrer"`
 	UserAgent        string    `json:"user_agent"`
 	ScreenResolution string    `json:"screen_resolution"`
+}
+
+type EventStore struct {
+	db *sql.DB
+}
+
+func NewEventStore() (*EventStore, error) {
+	err := godotenv.Load()
+	if err != nil {
+		return nil, err
+	}
+
+	host := os.Getenv("DB_HOST")
+	portStr := os.Getenv("DB_PORT")
+	user := os.Getenv("DB_USER")
+	password := os.Getenv("DB_PASSWORD")
+	dbname := os.Getenv("DB_NAME")
+
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		return nil, err
+	}
+
+	connStr := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
+		host, port, user, password, dbname)
+
+	db, err := sql.Open("postgres", connStr)
+	if err != nil {
+		return nil, err
+	}
+
+	err = db.Ping()
+	if err != nil {
+		return nil, err
+	}
+
+	return &EventStore{db: db}, nil
+}
+
+func (es *EventStore) Close() {
+	es.db.Close()
+}
+
+func (es *EventStore) Insert(e *Event) error {
+	// TODO: need to validate string length before inserting
+
+	sqlStatement := `
+		INSERT INTO events (
+			account_id,
+			client_id,
+			session_id,
+			name, 
+			value, 
+			timestamp,
+			page_location,
+			page_title,
+			page_referrer,
+			user_agent,
+			screen_resolution
+		)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+		RETURNING id`
+
+	row := es.db.QueryRow(sqlStatement, e.AccountID, e.ClientID, e.SessionID,
+		e.Name, e.Value, e.Timestamp, e.PageLocation, e.PageTitle, e.PageReferrer,
+		e.UserAgent, e.ScreenResolution)
+
+	return row.Scan(&e.ID)
 }
 
 type ModeledDimension struct {
@@ -119,7 +186,7 @@ func buildSQL(dimensions []ModeledDimension, measures []ModeledMeasure, limit in
 
 func Retrieve(db *sql.DB, modeledDimensions []ModeledDimension, modeledMeasures []ModeledMeasure) (*Table, error) {
 	if len(modeledDimensions) == 0 && len(modeledMeasures) == 0 {
-		return nil, ErrNoResult
+		return nil, sql.ErrNoRows
 	}
 
 	rows, err := db.Query(buildSQL(modeledDimensions, modeledMeasures, 10))
