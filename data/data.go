@@ -32,6 +32,8 @@ type EventStore struct {
 }
 
 func NewEventStore() (*EventStore, error) {
+	// I might need to not do this work here if I need a Session Store too?
+	// Something to revisit
 	err := godotenv.Load()
 	if err != nil {
 		return nil, err
@@ -70,7 +72,7 @@ func (es *EventStore) Close() {
 
 func (es *EventStore) Insert(e *Event) error {
 	// TODO: need to validate string length before inserting
-
+	// Database table has limits on string length for some column
 	sqlStatement := `
 		INSERT INTO events (
 			account_id,
@@ -95,130 +97,176 @@ func (es *EventStore) Insert(e *Event) error {
 	return row.Scan(&e.ID)
 }
 
-type ModeledDimension struct {
-	Label string
+type modeledDimension struct {
+	label string
 	sql   string
 }
 
-type ModeledMeasure struct {
-	Label string
+func (md *modeledDimension) Label() string {
+	return md.label
+}
+
+type modeledMeasure struct {
+	label string
 	sql   string
+}
+
+func (mm *modeledMeasure) Label() string {
+	return mm.label
 }
 
 var (
-	EventName = ModeledDimension{
-		Label: "Event Name",
+	EventName = modeledDimension{
+		label: "Event Name",
 		sql:   `name`,
 	}
-	Date = ModeledDimension{
-		Label: "Date",
+	Date = modeledDimension{
+		label: "Date",
 		sql:   `TO_CHAR(timestamp, 'YYYY-MM-DD')`,
 	}
 )
 
 var (
-	EventCount = ModeledMeasure{
-		Label: "Event Count",
+	EventCount = modeledMeasure{
+		label: "Event Count",
 		sql:   `COUNT(*)`,
 	}
-	EventValue = ModeledMeasure{
-		Label: "Event Value",
+	EventValue = modeledMeasure{
+		label: "Event Value",
 		sql:   `ROUND(SUM(value),2)`,
 	}
 )
 
-type Dimension string
-
-type Measure float64
-
-type Row struct {
-	Dimensions []Dimension
-	Measures   []Measure
+type query struct {
+	db         *sql.DB
+	dimensions []modeledDimension
+	measures   []modeledMeasure
+	limit      uint32 // Limit of 0 drops LIMIT clause from SQL statement
 }
 
-type Table struct {
-	DimensionHeaders []ModeledDimension
-	MeasureHeaders   []ModeledMeasure
-	Rows             []Row
+type result struct {
+	query *query
+	rows  *sql.Rows
 }
 
-func buildSQL(dimensions []ModeledDimension, measures []ModeledMeasure, limit int) string {
+func (es *EventStore) NewQuery() *query {
+	return &query{db: es.db}
+}
+
+func (q *query) Dimensions(mds ...modeledDimension) *query {
+	q.dimensions = mds
+	return q
+}
+
+func (q *query) Measures(mms ...modeledMeasure) *query {
+	q.measures = mms
+	return q
+}
+
+func (q *query) Limit(limit uint32) *query {
+	q.limit = limit
+	return q
+}
+
+func (q *query) buildSQL() string {
 	var sqlBuilder strings.Builder
 	sqlBuilder.WriteString("SELECT ")
 
-	if len(dimensions) > 0 && len(measures) == 0 {
+	if len(q.dimensions) > 0 && len(q.measures) == 0 {
 		sqlBuilder.WriteString("DISTINCT ")
 	}
 
-	for i, dimension := range dimensions {
+	for i, dimension := range q.dimensions {
 		sqlBuilder.WriteString(dimension.sql)
-		if !(i == len(dimensions)-1 && len(measures) == 0) {
+		if !(i == len(q.dimensions)-1 && len(q.measures) == 0) {
 			sqlBuilder.WriteString(", ")
 		}
 	}
 
-	for i, measure := range measures {
+	for i, measure := range q.measures {
 		sqlBuilder.WriteString(measure.sql)
-		if i != len(measures)-1 {
+		if i != len(q.measures)-1 {
 			sqlBuilder.WriteString(", ")
 		}
 	}
 
 	sqlBuilder.WriteString(" FROM events ")
 
-	if len(dimensions) == 0 {
-		sqlBuilder.WriteString(fmt.Sprintf(" LIMIT %d", limit))
+	if len(q.dimensions) == 0 && q.limit != 0 {
+		sqlBuilder.WriteString(fmt.Sprintf(" LIMIT %d", q.limit))
 		return sqlBuilder.String()
 	}
 
 	sqlBuilder.WriteString("GROUP BY ")
 
-	for i := range dimensions {
+	for i := range q.dimensions {
 		sqlBuilder.WriteString(strconv.Itoa(i + 1))
-		if i != len(dimensions)-1 {
+		if i != len(q.dimensions)-1 {
 			sqlBuilder.WriteString(", ")
 		}
 	}
 
-	sqlBuilder.WriteString(fmt.Sprintf(" LIMIT %d", limit))
+	if q.limit != 0 {
+		sqlBuilder.WriteString(fmt.Sprintf(" LIMIT %d", q.limit))
+	}
+
 	return sqlBuilder.String()
 }
 
-func Retrieve(db *sql.DB, modeledDimensions []ModeledDimension, modeledMeasures []ModeledMeasure) (*Table, error) {
-	if len(modeledDimensions) == 0 && len(modeledMeasures) == 0 {
+func (q *query) Query() (*result, error) {
+	if len(q.dimensions) == 0 && len(q.measures) == 0 {
 		return nil, sql.ErrNoRows
 	}
 
-	rows, err := db.Query(buildSQL(modeledDimensions, modeledMeasures, 10))
+	rows, err := q.db.Query(q.buildSQL())
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
+	return &result{rows: rows, query: q}, nil
+}
+
+func (r *result) Close() {
+	r.rows.Close()
+}
+
+type Row struct {
+	Dimensions []string
+	Measures   []float64
+}
+
+type Table struct {
+	DimensionHeaders []modeledDimension
+	MeasureHeaders   []modeledMeasure
+	Rows             []Row
+}
+
+func (r *result) Table() (*Table, error) {
 	table := Table{
-		DimensionHeaders: modeledDimensions,
-		MeasureHeaders:   modeledMeasures,
+		DimensionHeaders: r.query.dimensions,
+		MeasureHeaders:   r.query.measures,
 	}
-	for rows.Next() {
+
+	for r.rows.Next() {
 		row := Row{
-			Dimensions: make([]Dimension, len(modeledDimensions)),
-			Measures:   make([]Measure, len(modeledMeasures)),
+			Dimensions: make([]string, len(table.DimensionHeaders)),
+			Measures:   make([]float64, len(table.MeasureHeaders)),
 		}
 
-		scanVals := make([]any, len(modeledDimensions)+len(modeledMeasures))
+		scanVals := make([]any, len(table.DimensionHeaders)+len(table.MeasureHeaders))
 		for i := range row.Dimensions {
 			scanVals[i] = &row.Dimensions[i]
 		}
 		for i := range row.Measures {
-			scanVals[len(modeledDimensions)+i] = &row.Measures[i]
+			scanVals[len(table.DimensionHeaders)+i] = &row.Measures[i]
 		}
 
-		if err := rows.Scan(scanVals...); err != nil {
+		if err := r.rows.Scan(scanVals...); err != nil {
 			return nil, err
 		}
 		table.Rows = append(table.Rows, row)
 	}
-	if err := rows.Err(); err != nil {
+	if err := r.rows.Err(); err != nil {
 		return nil, err
 	}
 

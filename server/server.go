@@ -6,8 +6,6 @@ import (
 	"log"
 	"net/http"
 
-	_ "github.com/lib/pq"
-
 	"ga4ct/data"
 	"ga4ct/templates"
 )
@@ -19,14 +17,13 @@ func main() {
 	}
 	defer eventStore.Close()
 
-	// Handler function for storing events from pixel
+	// Handler function for storing events sent from pixels
 	http.HandleFunc("/collect", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
 			return
 		}
 
-		// Read the request body
 		var event data.Event
 		err = json.NewDecoder(r.Body).Decode(&event)
 		if err != nil {
@@ -48,7 +45,18 @@ func main() {
 			return
 		}
 
-		templates.Placeholder().Render(r.Context(), w)
+		res, err := eventStore.NewQuery().Dimensions(data.EventName).
+			Measures(data.EventCount, data.EventValue).Limit(10).Query()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+
+		table, err := res.Table()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+
+		templates.Index(table).Render(r.Context(), w)
 	})
 
 	pixelFs := http.FileServer(http.Dir("./pixel"))
