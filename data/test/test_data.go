@@ -51,7 +51,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	chart, err := res.LineChart()
+	chart, err := res.Chart()
 	if err != nil {
 		log.Fatal(err)
 	}

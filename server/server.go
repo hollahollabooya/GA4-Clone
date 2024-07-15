@@ -66,14 +66,25 @@ func main() {
 		}
 		defer res2.Close()
 
-		lineChart, err := res2.LineChart()
+		lineChart, err := res2.Chart()
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		fmt.Printf("%v\n", *lineChart)
+		// Line Chart Data
+		res3, err := eventStore.NewQuery().Dimensions(data.EventName).
+			Measures(data.EventCount).Limit(10).Query()
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer res2.Close()
 
-		templates.Index(table, lineChart).Render(r.Context(), w)
+		barChart, err := res3.Chart()
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		templates.Index(table, lineChart, barChart).Render(r.Context(), w)
 	})
 
 	pixelFs := http.FileServer(http.Dir("./pixel"))

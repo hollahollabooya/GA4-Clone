@@ -3,7 +3,7 @@ package templates
 import "ga4ct/data"
 import "fmt"
 
-templ Index(table *data.Table, lineChartData *[]data.DataSet) {
+templ Index(table *data.Table, lineChartData, barChartData *[]data.DataSet) {
     <html>
     <head>
         <title>Website Index</title>
@@ -12,15 +12,15 @@ templ Index(table *data.Table, lineChartData *[]data.DataSet) {
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     </head>
     <body>
-        @reportLayout(table, lineChartData)
+        @reportLayout(table, lineChartData, barChartData)
     </body>
     </html>
 }
 
-templ reportLayout(table *data.Table, lineChartData *[]data.DataSet) {
+templ reportLayout(table *data.Table, lineChartData, barChartData *[]data.DataSet) {
     <div id="reports-container" class="container mx-auto columns-2">
         @lineChart(lineChartData)
-        // @barChart(barChartData)
+        @barChart(barChartData)
     </div>
     <div id="events-table-container" class="container mx-auto columns-1">
         @eventsTable(table)
@@ -35,6 +35,7 @@ templ lineChart(data *[]data.DataSet) {
 
         @templ.JSONScript("line-chart-data", *data)
         <script>
+        {
             let data = JSON.parse(document.getElementById("line-chart-data").textContent);
             let ctx = document.getElementById("line-chart")
 
@@ -44,16 +45,30 @@ templ lineChart(data *[]data.DataSet) {
                     datasets: data
                 }
             });
+        }
         </script>
     </div>
 }
 
-// templ barChart(data *data.Table) {
-//     <div id="bar-chart">
-//         @templ.JSONScript("bar-chart-data", *data)
-//         <p>"A bar chart will go here"</p>
-//     </div>
-// }
+templ barChart(data *[]data.DataSet) {
+    <div id="bar-chart-container">
+        <canvas id="bar-chart"></canvas>
+        @templ.JSONScript("bar-chart-data", *data)
+        <script>
+        {
+            let data = JSON.parse(document.getElementById("bar-chart-data").textContent);
+            let ctx = document.getElementById("bar-chart")
+
+            new Chart (ctx, {
+                type: 'bar',
+                data: {
+                    datasets: data
+                }
+            });
+        }
+        </script>
+    </div>
+}
 
 templ eventsTable(data *data.Table) {
     <table id="table" border="1">

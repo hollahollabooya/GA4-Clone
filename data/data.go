@@ -297,7 +297,7 @@ var ErrResultMalformed = errors.New("result malformed for this data transformati
  * 	* 2 Dimenions, 1 Measure
  *  * 1 Dimension, N Measures
  */
-func (r *result) LineChart() (*[]DataSet, error) {
+func (r *result) Chart() (*[]DataSet, error) {
 	numDimensions := len(r.query.dimensions)
 	numMeasures := len(r.query.measures)
 
