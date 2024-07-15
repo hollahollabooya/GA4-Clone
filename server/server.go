@@ -45,18 +45,35 @@ func main() {
 			return
 		}
 
+		// Table data
 		res, err := eventStore.NewQuery().Dimensions(data.EventName).
 			Measures(data.EventCount, data.EventValue).Limit(10).Query()
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
+		defer res.Close()
 
 		table, err := res.Table()
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 
-		templates.Index(table).Render(r.Context(), w)
+		// Line Chart Data
+		res2, err := eventStore.NewQuery().Dimensions(data.Date, data.EventName).
+			Measures(data.EventCount).Limit(50).Query()
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer res2.Close()
+
+		lineChart, err := res2.LineChart()
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		fmt.Printf("%v\n", *lineChart)
+
+		templates.Index(table, lineChart).Render(r.Context(), w)
 	})
 
 	pixelFs := http.FileServer(http.Dir("./pixel"))

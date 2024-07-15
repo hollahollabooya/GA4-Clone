@@ -3,7 +3,7 @@ package templates
 import "ga4ct/data"
 import "fmt"
 
-templ Index(table *data.Table) {
+templ Index(table *data.Table, lineChartData *[]data.DataSet) {
     <html>
     <head>
         <title>Website Index</title>
@@ -12,47 +12,41 @@ templ Index(table *data.Table) {
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     </head>
     <body>
-        @reportLayout(table)
+        @reportLayout(table, lineChartData)
     </body>
     </html>
 }
 
-templ reportLayout(table *data.Table) {
-    // <div id="reports-container" class="container mx-auto columns-2">
-    //     @lineChart(lineChartData)
-    //     @barChart(barChartData)
-    // </div>
+templ reportLayout(table *data.Table, lineChartData *[]data.DataSet) {
+    <div id="reports-container" class="container mx-auto columns-2">
+        @lineChart(lineChartData)
+        // @barChart(barChartData)
+    </div>
     <div id="events-table-container" class="container mx-auto columns-1">
         @eventsTable(table)
     </div>
 }
 
-// templ lineChart(data *data.Table) {
-//     <div id="line-chart">
-//         <canvas id="line-chart"></canvas>
-//         // Use this to pass down the data to the client
-//         // https://templ.guide/syntax-and-usage/script-templates#pass-server-side-data-to-the-client-in-a-script-element
+templ lineChart(data *[]data.DataSet) {
+    <div id="line-chart-container">
+        <canvas id="line-chart"></canvas>
+        // Use this to pass down the data to the client
+        // https://templ.guide/syntax-and-usage/script-templates#pass-server-side-data-to-the-client-in-a-script-element
 
-//         @templ.JSONScript("line-chart-data", *data)
-//         <script>
-//             let data = JSON.parse(document.getElementById("line-chart-data").textContent);
-//             let ctx = document.getElementById("line-chart")
+        @templ.JSONScript("line-chart-data", *data)
+        <script>
+            let data = JSON.parse(document.getElementById("line-chart-data").textContent);
+            let ctx = document.getElementById("line-chart")
 
-//             new Chart (ctx, {
-//                 type: 'line',
-//                 data: {
-//                     datasets: data.Rows
-//                 },
-//                 options: {
-//                     parsing: {
-//                         xAxisKey: 'Dimensions[0]',
-//                         yAxisKey: 'Measures[0]'
-//                     }
-//                 }
-//             });
-//         </script>
-//     </div>
-// }
+            new Chart (ctx, {
+                type: 'line',
+                data: {
+                    datasets: data
+                }
+            });
+        </script>
+    </div>
+}
 
 // templ barChart(data *data.Table) {
 //     <div id="bar-chart">

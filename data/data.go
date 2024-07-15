@@ -2,6 +2,7 @@ package data
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -190,14 +191,19 @@ func (q *query) buildSQL() string {
 		}
 	}
 
-	sqlBuilder.WriteString(" FROM events ")
+	sqlBuilder.WriteString(" FROM events")
 
-	if len(q.dimensions) == 0 && q.limit != 0 {
+	// To-Do: revisit this and debug
+	if len(q.measures) == 0 && q.limit != 0 {
 		sqlBuilder.WriteString(fmt.Sprintf(" LIMIT %d", q.limit))
 		return sqlBuilder.String()
 	}
 
-	sqlBuilder.WriteString("GROUP BY ")
+	if len(q.dimensions) == 0 {
+		return sqlBuilder.String()
+	}
+
+	sqlBuilder.WriteString(" GROUP BY ")
 
 	for i := range q.dimensions {
 		sqlBuilder.WriteString(strconv.Itoa(i + 1))
@@ -271,4 +277,96 @@ func (r *result) Table() (*Table, error) {
 	}
 
 	return &table, nil
+}
+
+// These data structures are defined to play nice with charts.js
+// https://www.chartjs.org/docs/latest/general/data-structures.html#object
+type dataPoint struct {
+	X string  `json:"x"`
+	Y float64 `json:"y"`
+}
+
+type DataSet struct {
+	Data []dataPoint `json:"data"`
+}
+
+var ErrResultMalformed = errors.New("result malformed for this data transformation")
+
+/* I might be able to handle an arbitrary number of dimensions + measures?
+ * But for now, I'll only allow either:
+ * 	* 2 Dimenions, 1 Measure
+ *  * 1 Dimension, N Measures
+ */
+func (r *result) LineChart() (*[]DataSet, error) {
+	numDimensions := len(r.query.dimensions)
+	numMeasures := len(r.query.measures)
+
+	// Need at least one dimension and measure
+	if !(numDimensions > 0 && numMeasures > 0) {
+		return nil, ErrResultMalformed
+	}
+
+	// More than 2 dimensions is straight out
+	if numDimensions > 2 {
+		return nil, ErrResultMalformed
+	}
+
+	// If 2 Dimensions, I can only accept 1 measure
+	if numDimensions == 2 && numMeasures != 1 {
+		return nil, ErrResultMalformed
+	}
+
+	var datasets []DataSet
+	dimensionMap := make(map[string]int)
+	curIndex := 0
+	if numDimensions == 1 {
+		datasets = make([]DataSet, numMeasures)
+	}
+
+	for r.rows.Next() {
+		row := Row{
+			Dimensions: make([]string, numDimensions),
+			Measures:   make([]float64, numMeasures),
+		}
+
+		scanVals := make([]any, numDimensions+numMeasures)
+		for i := range row.Dimensions {
+			scanVals[i] = &row.Dimensions[i]
+		}
+		for i := range row.Measures {
+			scanVals[numDimensions+i] = &row.Measures[i]
+		}
+
+		if err := r.rows.Scan(scanVals...); err != nil {
+			return nil, err
+		}
+
+		if numDimensions > 1 {
+			val, ok := dimensionMap[row.Dimensions[1]]
+			if !ok {
+				dimensionMap[row.Dimensions[1]] = curIndex
+				val = curIndex
+				curIndex++
+
+				datasets = append(datasets, DataSet{})
+			}
+			datasets[val].Data = append(datasets[val].Data, dataPoint{
+				X: row.Dimensions[0],
+				Y: row.Measures[0],
+			})
+		} else {
+			for i, val := range row.Measures {
+				datasets[i].Data = append(datasets[i].Data, dataPoint{
+					X: row.Dimensions[0],
+					Y: val,
+				})
+			}
+		}
+
+	}
+	if err := r.rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return &datasets, nil
 }
